@@ -1,0 +1,443 @@
+/**
+   Print out the number of records selected by the specified conditions.
+   If more than one time step is present in the data file, the same set of
+   conditions will be applied to each time step separatedly.
+
+   command line arguments:
+   -f name-of-hdf5-file
+   -i name-of-index-file
+   -q query-conditions-in-a-single-string
+   -p name-of-variable-to-print-or-histogram
+   -h use-h5part-data
+
+   Each option -f and -q should be specified only once.  If multiple of
+   them are specified, the last one will override all previous ones.
+   Options -v and -t are cumulative.  The arguments to -v will be added
+   together and the arguments to -t will be cumulated and sorted in a
+   std::set.
+
+*/
+
+#include "queryProcessor.h"
+#include <iostream>
+
+static char *condstring = 0;
+static std::string datafile;
+static std::string indexfile;
+static std::string logfile;
+static std::string conffile;
+static char *fileFormat = 0;
+static std::string varPath;
+static std::vector<const char *> varNames;
+static bool useBoxSelection = false;
+static bool equalityTest = false;
+static bool xport = false;
+static int mpi_len = 1000;
+static int mpi_dim = 0;
+
+void parseArgs(int argc, char **argv) {
+    static const char *options="d:D:f:F:n:N:m:M:q:Q:p:P:i:I:v:V:xXl:L:bBeEg:G:c:C:";
+    extern char *optarg;
+    int c;
+    while ((c = getopt(argc, argv, options)) != -1) {
+        switch (c) {
+	case 'd':
+	case 'D':
+	case 'f':
+	case 'F': datafile = optarg; break;
+	case 'i':
+	case 'I': indexfile = optarg; break;
+	case 'g':
+	case 'G': logfile = optarg; break;
+	case 'n':
+	case 'N': varNames.push_back(optarg); break;
+	case 'p':
+	case 'P': varPath = optarg; break;
+	case 'q':
+	case 'Q': condstring = optarg; break;
+	case 'v':
+	case 'V': ibis::gVerbose = atoi(optarg); break;
+	case 'b':
+	case 'B': useBoxSelection = true; break;
+	case 'e':
+	case 'E': equalityTest = true; break;
+	case 'x':
+	case 'X': xport = true; break;
+	case 'm':
+	case 'M': fileFormat = optarg; break;
+	case 'l':
+	case 'L': mpi_len = atoi(optarg);break; 
+	case 'c':
+	case 'C': conffile = optarg; break;
+	default: break;
+        } // switch
+    } // while
+} // parseArgs
+
+int main(int argc, char **argv) {
+    ibis::gVerbose = 0;
+    parseArgs(argc, argv);
+    if (datafile.empty() || condstring == 0) {
+        std::cerr << "Usage:\n" << *argv 
+		  << " -f data-file-name" 
+	    " -q query-conditions-in-a-single-string"
+	    " [-i index-file-name]"
+	    " [-g log-file-name]"
+	    " [-n name-of-variable]"
+	    " [-p path-of-variable]" 
+	    " [-m file model [HDF5(default), H5PART, NETCDF, PNETCDF]"
+	    " [-b use-boundingbox-data-selection]"
+	    " [-v verboseness]"
+	    " [-l mpi-subarray-length]"
+	    "\n e.g:   ./queryIndex -f h5uc-data-index.h5 -q 'px < 0.3' "
+	    "-n y -p TimeStep2\n\n"
+	    "\tFor More detailed usage description and examples, "
+	    "please see file GUIDE"
+		  << std::endl;
+	return -1;
+    }
+
+#ifndef FQ_NOMPI
+    MPI_Init(&argc, &argv);
+    int mpi_size, mpi_rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+#endif
+
+    if (! logfile.empty()){
+#ifndef FQ_NOMPI
+	std::ostringstream oss;
+	oss << logfile << "-" << mpi_rank << ".log";
+	logfile = oss.str();
+#endif
+        std::cout << *argv << " is to redirect log messages to \""
+		  << logfile << "\" ..." << std::endl;
+	ibis::util::setLogFileName(logfile.c_str());
+    }
+
+    if (! conffile.empty())
+	ibis::gParameters().read(conffile.c_str());
+    ibis::gParameters().add(FQ_REPORT_STATISTIC, "false");
+
+    FQ::FileFormat ffmt = FQ::FQ_HDF5;
+    if (fileFormat != 0) {
+        std::string format = fileFormat;
+        if (format.compare("HDF5") == 0) {
+            ffmt = FQ::FQ_HDF5;
+        } else if (format.compare("H5PART") == 0) {
+            ffmt = FQ::FQ_H5Part;
+        } else if (format.compare("NETCDF") == 0) {
+            ffmt = FQ::FQ_NetCDF;
+        } else if (format.compare("PNETCDF") == 0) {
+            ffmt = FQ::FQ_pnetCDF;
+        }
+    }
+
+    if (ibis::gVerbose > 1) {
+	ibis::util::logger lg;
+	lg() << *argv << " data file \"" << datafile << "\"";
+	if (! indexfile.empty())
+	    lg() << "\tindexfile \"" << indexfile.c_str() << "\"";
+	if (! varPath.empty())
+	    lg() << "\tvariable path \"" << varPath << "\"";
+	if (! varNames.empty())
+	    lg() << "\twith "  << varNames.size() << " variable name"
+		 << (varNames.size()>1?"s":"") << " ...";
+    }
+
+    ibis::util::timer totTimer(*argv, 1);
+    // open the named file
+    QueryProcessor* queryProcessor =
+	new QueryProcessor(datafile, ffmt, indexfile, ibis::gVerbose);
+    if (queryProcessor->isValid() == false) {
+	LOGGER(ibis::gVerbose > 0)
+	    << "ERROR: failed to initiate the QueryProcessor object for file \"" 
+	    << datafile.c_str() << "\" ...\n";
+
+	delete(queryProcessor);
+#ifndef FQ_NOMPI
+        MPI_Finalize();
+#endif
+	return -2;
+    }
+
+    unsigned int hits = 0;
+    // getNumHits
+    hits = queryProcessor->getNumHits(condstring, varPath, mpi_dim, mpi_len);
+    LOGGER(ibis::gVerbose > 1)
+	<< *argv << " processed conditions \"" << condstring 
+	<< "\" and produced " << hits << " hit" << (hits>1?"s":"");
+
+    if (hits <= 0) {
+	LOGGER(ibis::gVerbose > 1)
+	    << "Warning -- No element is seleteced by \"" << condstring << "\"";
+
+    	delete(queryProcessor);
+#ifndef FQ_NOMPI
+    	MPI_Finalize();
+#endif
+	return -3;
+    }
+    LOGGER(ibis::gVerbose > 0)
+	<< *argv << " successfully completed query \"" << condstring
+	<< "\" with "<< hits << " hit" << (hits>1?"s":"");
+    if (varNames.empty()) return 0;
+
+    std::string variable;
+    std::vector<uint64_t> dims;
+    FQ::DataType type;
+    if (!queryProcessor->getVariableInfo(varNames[0], variable, dims, &type, varPath)) {
+        if (ibis::gVerbose > 0) {
+            std::cout << "ERROR: Failed to get the information for variable \"" << variable.c_str()
+                << "\" from file \"" << datafile.c_str() << "\"" << std::endl;
+        }
+        delete(queryProcessor);
+        #ifndef FQ_NOMPI
+            MPI_Finalize();
+        #endif
+        return -3;
+    }
+
+    // executeQuery
+    uint64_t hits1=0;
+    std::vector<uint64_t> coords;
+    if (useBoxSelection) {
+        coords.reserve(hits*2*dims.size());
+	hits1 = queryProcessor->executeQuery
+	    ((char*)condstring, coords, varPath, FQ::BOXES_SELECTION,
+	     mpi_dim, mpi_len);
+    } else {
+        coords.reserve(hits*dims.size());
+	hits1 = queryProcessor->executeQuery
+	    ((char*)condstring, coords, varPath, FQ::POINTS_SELECTION,
+	     mpi_dim, mpi_len);
+    }
+    if (xport) {
+	ibis::util::logger lg;
+	lg() << "selected coordinates:";
+	for(int i=0; i<coords.size(); i++) {
+	    lg() << "\n" << coords[i];
+	}
+    }
+    if (hits != hits1) {
+	LOGGER(ibis::gVerbose >= 0)
+	    << "Warning -- number of hits does not match";
+
+        delete(queryProcessor);
+#ifndef FQ_NOMPI
+        MPI_Finalize();
+#endif
+    	return -4;
+    }
+
+    for (unsigned j = 0; j < varNames.size(); ++ j) {
+	std::string variable, vn;
+	std::vector<uint64_t> dims;
+	FQ::DataType type;
+	bool berr = true;
+	vn = varNames[j];
+	berr = queryProcessor->getVariableInfo
+	    (vn, variable, dims, &type, varPath);
+	if (! berr) {
+	    LOGGER(ibis::gVerbose > 0)
+		<< "Warning -- Failed to get the information for variable \""
+		<< variable << "\" from file \"" << datafile << "\"";
+
+	    delete(queryProcessor);
+#ifndef FQ_NOMPI
+	    MPI_Finalize();
+#endif
+	    return -5;
+	}
+
+    	// getSelectedData
+    	std::vector <double> values;
+    	switch(type) {
+	case FQ::FQT_BYTE: {
+	    std::vector<char> data;
+	    data.resize(hits1);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	case FQ::FQT_FLOAT: {
+	    std::vector<float> data;
+	    data.resize(hits);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	case FQ::FQT_DOUBLE: {
+	    std::vector<double> data;
+	    data.resize(hits);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	case FQ::FQT_INT: {
+	    std::vector<int32_t> data;
+	    data.resize(hits);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	case FQ::FQT_LONG: {
+	    std::vector<int64_t> data;
+	    data.resize(hits);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	case FQ::FQT_UINT: {
+	    std::vector<uint32_t> data;
+	    data.resize(hits);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	case FQ::FQT_ULONG: {
+	    std::vector<uint64_t> data;
+	    data.resize(hits);
+	    if (useBoxSelection) {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath, FQ::BOXES_SELECTION);
+	    } else {
+		berr = queryProcessor->getSelectedData
+		    (vn, coords, &data[0], varPath);
+	    }
+	    values.resize(data.size());
+	    for(unsigned int i=0; i<data.size(); i++) {
+		values[i] = (double)data[i];
+	    }
+	    break;}
+	default:
+	    LOGGER(ibis::gVerbose > 0)
+            	<< "Warning -- Data type " << type << " is not supported";
+	    delete(queryProcessor);
+#ifndef FQ_NOMPI
+            MPI_Finalize();
+#endif
+    	    return -5;
+    	}
+ 	if (! berr) {
+	    LOGGER(ibis::gVerbose > 0)
+		<< "Warning -- Failed to get selected data";
+
+	    delete(queryProcessor);
+#ifndef FQ_NOMPI
+            MPI_Finalize();
+#endif
+    	    return -6;
+	}
+
+    	if (xport) {
+	    ibis::util::logger lg;
+	    lg() << "Selected data:";
+	    for (unsigned int i=0; i<values.size(); i++) {
+	    	std::cout << "\n" << values[i];
+	    }
+	}
+
+	if (equalityTest) { // executeEqualitySelectionQuery
+	    std::vector<uint64_t> eqCoords;
+	    eqCoords.reserve(coords.size());
+	    if (coords.size() == 0) {
+		LOGGER(ibis::gVerbose > 1)
+		    << "Warning -- No element is seleteced ==>"
+		    << " executeEqualitySelectionQuery is skipped";
+	    } else {
+		if (useBoxSelection) {
+		    queryProcessor->executeEqualitySelectionQuery
+			(vn, values, eqCoords, varPath,
+			 FQ::BOXES_SELECTION, mpi_dim, mpi_len);
+		} else {
+		    queryProcessor->executeEqualitySelectionQuery
+			(vn, values, eqCoords, varPath,
+			 FQ::POINTS_SELECTION, mpi_dim, mpi_len);
+		}
+		bool match = (eqCoords.size() == coords.size());
+		for (unsigned int i = 0; match && i < eqCoords.size(); i++)
+		    match = (eqCoords[i] == coords[i]);
+		if (! match) {
+		    ibis::util::logger lg;
+		    lg() << "Warning -- the equality selection (as a list of "
+			"doubles) produced a different set of coordinates "
+			"as input "
+			 << eqCoords.size() << " != " << coords.size();
+		    if (xport) {
+			lg() << "selected coordinates:";
+			for(int i=0; i<coords.size() && i<eqCoords.size(); i++) {
+			    lg() << "\n" << coords[i] << " <> " << eqCoords[i];
+			}
+		    }
+		    delete(queryProcessor);
+#ifndef FQ_NOMPI
+		    MPI_Finalize();
+#endif
+		    return -7;
+		} else {
+		    LOGGER(ibis::gVerbose > 1)
+			<< "the equality selection (as a list of doubles)"
+			" produced the same set of coordinates"; 
+		}
+	    }
+	}
+    }
+    LOGGER(ibis::gVerbose > 0)
+	<< *argv << " successfully complete processing query with " 
+	<< hits << " hit" << (hits>1?"s":"");
+
+    delete(queryProcessor);
+#ifndef FQ_NOMPI
+    MPI_Finalize();
+#endif
+    return 0;
+} // main

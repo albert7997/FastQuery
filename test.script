@@ -1,0 +1,15 @@
+#PBS -S /usr/bin/csh
+#PBS -q debug
+#PBS -l mppwidth=1
+#PBS -l walltime=00:15:00
+#PBS -j eo
+
+setenv CRAY_ROOTFS DSL
+#setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/opt/cray/netcdf/4.1.1.0/netcdf-gnu/lib
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/project/projectdirs/m1248/hopper/fastbit/lib/
+
+module swap PrgEnv-pgi PrgEnv-gnu
+
+cd /global/u1/j/jchou/work/fq-repo # please replace with the current directory location
+
+aprun -n 1 -a xt ./test-hdf5.sh 3 log > out

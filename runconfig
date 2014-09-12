@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+# a script to record the typical settings for the configure script on a
+# few machines fequently used by the developers
+use Env qw(HOSTNAME HOME PWD);
+if (! ${HOSTNAME}) {
+    $HOSTNAME=`hostname`;
+}
+print "Configuring on ${HOSTNAME}\n";
+if (${HOSTNAME} =~ "^bit") {
+    $MYPKG="${HOME}/`uname -s`";
+    # work with serial version of ADIOS, netCDF and HDF5
+    $cmd="./configure --prefix=${MYPKG}/fq --with-fastbit=${MYPKG}/fastbit --with-hdf5=${MYPKG}/hdf5 --with-szlib=${MYPKG}/hdf5 --with-netcdf=${MYPKG}/netcdf --with-bp=${MYPKG}/adios --enable-debug --disable-xopt --disable-parallel";
+    # parallel installation with openMPI. FastBit, HDF5 and netCDF are in $MYPKG
+    #$cmd="CC=openmpicc CXX=openmpicxx ./configure --prefix=${MYPKG}/fq --with-fastbit=${MYPKG}/fastbit --with-hdf5=/opt/local --with-szlib=/opt/local --with-netcdf=${MYPKG}/netcdf --with-bp=${MYPKG}/adios --enable-parallel --enable-debug --disable-xopt --enable-static --disable-shared";
+}
+elsif (${HOSTNAME} =~ m/^data5[.lbl.gov]?$/) {
+# on data5, use GCC compilers with prefix /data/john/Linux, hdf5 only have static library
+  $cmd="./configure CC=/software/mpich/2-1.3.2p1/bin/mpicc CXX=/software/mpich/2-1.3.2p1/bin/mpic++ prefix=/data/john/Linux/fq --with-fastbit=/data/john/Linux/fastbit --with-hdf5=/software/hdf5/1.8.7 --with-netcdf=/software/netcdf/4.1.2 --disable-shared"
+}
+elsif (${HOSTNAME} =~ m/^data\w*[.lbl.gov]?$/) {
+# data[1234].lbl.gov
+# use GCC compilers with prefix /fastbit/Linux
+  $cmd="./configure CC=/software/mpich/2-1.3.2p1/bin/mpicc CXX=/software/mpich/2-1.3.2p1/bin/mpic++ prefix=/fastbit/Linux/fq --with-fastbit=/fastbit/Linux/fastbit --with-hdf5=/software/hdf5/1.8.7 --with-netcdf=/software/netcdf/4.1.2 --disable-shared"
+}
+elsif (${HOSTNAME} =~ m/^hopper\w+[.nersc.gov]?$/) {
+# on hopper at NERSC, use the default Cray compilers wrappers over PGI compilers, no debugging
+#    print "\nPlease make sure that PrgEnv-gnu is used, for example by executing 'module swap PrgEnv-pgi PrgEnv-gnu'\n\n";
+# NOTE that the netCDF and HDF5 versions must match!
+# --with-netcdf=/opt/cray/netcdf-hdf5parallel/4.1.1.0/netcdf-hdf5parallel-gnu
+# --with-pnetcdf=/project/projectdirs/m1248/hopper/pnetcdf-1.2.0
+    $cmd="./configure CC=cc CXX=CC --disable-shared --enable-debug --prefix=/project/projectdirs/m1248/hopper/pgi/fastquery --with-fastbit=/project/projectdirs/m1248/hopper/pgi/fastbit --with-bp=/global/homes/p/pnorbert/adios/1.4.1/hopper/pgi --disable-hdf5 --disable-netcdf";
+#    $cmd="./configure CC=pgcc CXX=pgCC --disable-shared --enable-debug --prefix=/project/projectdirs/m1248/hopper/pgi/fastquery --with-fastbit=/project/projectdirs/m1248/hopper/pgi/fastbit --with-bp=/global/homes/p/pnorbert/adios/1.4.1/hopper/pgi --disable-hdf5 --disable-netcdf --disable-parallel";
+}
+elsif (defined $EV{"NERSC_HOST"}) {
+# on a NERSC machine, use the default GCC compilers, no debugging
+  use Env qw(NERSC_HOST);
+    $cmd="./configure --disable-shared --without-getpwuid --disable-debug --prefix=/project/projectdirs/m1248/${NERSC_HOST}/gcc/fastbit";
+}
+else {
+    $cmd="./configure --prefix=${HOME}/`uname -s`/fq"
+}
+#
+print "$cmd\n\n";
+system($cmd);

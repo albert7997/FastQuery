@@ -1,0 +1,326 @@
+2013-03-19 Jerry Chou
+	* src/fq.*: add optional flag to call getData collectively or
+	independently
+	* src/queryProcessor.*: add optional flag to broadcast
+	query results
+	* src/indexBuilder.*: add optional flag to setData collectively or
+	independently
+
+2013-02-22 Jerry Chou
+	* examples/queryIndex.cpp: allocate memory to coords
+	* src/hdf5file.cpp: fix the maximum chunk size under multidimension
+	size[0] = floor(FQ_MAX_CHUNK_SIZE/(totalSize/dim[0]));
+	* add flag "-lm" for HDF5 in configure.ac
+	* fix the bug when determining the mpi_max_iter
+2013-02-13 John Wu
+        * src/fq.h: replace the argument streaming with a void* to make it
+	possible to pass an ADIOS read method to BPArrayIODriver
+
+2013-02-13 John Wu
+	* src/ArrayIODriver.h: change nextStepInStream to nextStep,
+	this function can also be used in nonstreaming mode
+	* src/queryProcessor.cpp, src/indexBuilder.cpp: use the new
+	function to advance through steps
+
+2013-02-12 John Wu
+	* configure.ac: update to work with ADIOS 1.4.1 on ORNL machines
+	* examples/BPread.cpp: add function doRead to limit the scope of
+	queryProcessor (in order to properly close the open files before
+	MPI_Finalize)
+	* src/fqIndex.cpp: change function buildNew to consitently use
+	ierr >= 0 instead of mixing with ierr > 0
+	* src/queryProcessor.cpp: change all assignment of mpi_max_iter to
+	get the value returned from getMpiMaxIter
+
+2012-12-19 John Wu
+        * src/const.h: add conditional macro to allow user to specify
+	FQ_MAX_CHUNK_SIZE at compile time, change the default value to be
+	10 million
+
+2012-12-18 John Wu
+	* src/fqColumn.cpp: change loadIndex to make use std::auto_ptr to
+	free the temporary index objects in case they are not created
+	completely (a problem noticed by Benson Ma)
+	* src/queryParser.yy: add destructors to clean up after the
+	intermediate objects (a problem noticed by Benson Ma)
+
+2012-12-06 John Wu
+	* src/fq.cpp:242 add test to supress the reporting of time to PE
+	0 if the verbose level is less than 5 (to prevent massive number
+	reporting of timing values)
+	* examples/MagNullQueryIndex.cpp: add macro around MPI_Finalize to
+	make it usable without MPI
+
+2012-11-27 John Wu
+	* src/hdf5file.h: remove ibis.h from the list of included files
+	* src/const.h: change FQT_ERROR tp FQT_UNKNOWN, add FQT_UBYTE,
+	FQT_SHORT, and FQT_USHORT
+	* src/*.cpp: update files to deal with the newly added data types
+
+2012-11-12 John Wu
+	* runconfig: change version of ADIOS from 1.3.1 to 1.4.1 on hopper
+	* configure.ac: when --without-hdf5 is specified, also turn off
+	--enable-hdf5, cleanup the use of MXML_HOME, CXXCPFLAGS ->
+	CXXCPPFLAGS, make use of adios_config
+	* src/ArrayIODriver.h: add functions isStreaming, nextStepInStream
+	* src/queryProcessor.cpp: in function recordRegions add code to
+	deal with streaming data
+	* src/BPArrayIODrive.h:894 change the initial value of sz from -1
+	to 0
+	* examples/BP*.cpp: remove variable fileModel
+
+2012-11-09 John Wu
+	* src/metadataMgr.h: remove unused variable varCount from the
+	class
+	* src/fqPart.h: add function getQuery to return a pointer to the
+	mesh query object to be used by QueryProcessor::recordRegions
+	* src/queryProcessor.h, src/queryProcessor.cpp: add fucntion
+	QueryProcessor::recordRegions
+
+2012-11-08 John Wu
+	* src/fqVar.h: add functions VarInfo::copy, VarSpace::setOffsets,
+	VarSpace::setCounts, VarSpace::setStrides, rename
+	VarSpace::setName to VarSpace::setText (to match getText) -- this
+	new functions are used to implement metadataMgr::findShortMatch
+
+2012-11-07 John Wu
+	* examples/*.cpp: add option -d to be an alias for option -f (for
+	data file) (existing -d option changed to -x - for export)
+	* src/metadataMgr.cpp: add function findShortMatch
+
+2012-11-06 John Wu
+	* src/fqPart.cpp: change createQuery to attempt to reuse the
+	existing query tokens when the where clause is exactly the same
+
+2012-11-04 John Wu
+	* src/fqPart.h, src/fqPart.cpp: rename getHitPointCoords to
+	getHitsAsPoints and getHitBoxCoords as getHitsAsBoxes, update
+	their inline documentation, add function getHitsAsLines, change
+	the order of coordinates in a bounding box to the same as FastBit
+	meshQuery
+
+2012-11-03 John Wu
+	* src/fq.h, src/queryProcessor.h, src/indexBuilder.h: change the
+	default verboseness level to be ibis::gVerbose just in case it has
+	been set somewhere else (previous default value was 0, which
+	resets the value to 0 if it has been set elsewhere)
+	* src/ADIOS_Wrapper.h, src/ADIOS_Wrapper.cpp: change class
+	BPCommon to be a singleton class for the sole purpose of invoking
+	adios_init_noxml and adios_finalize (can not really use this
+	option because adios_finalize needs to be called before
+	MPI_Finalize)
+
+2012-11-01 John Wu
+	* src/const.h: change enum type DataModel to FileFormat
+	* examples/buildIndex.cpp: allow multiple -name options to be used
+	on one command line
+
+2012-10-31 John Wu
+	* src/BPArrayIODriver.cpp: modify composeFieldName to match
+	composeFBIprefix, consolidate the naming operations to use
+	composeFieldName only, remove function getFastBitADIOSVar (use
+	getADIOSVar instead), remove makeVariableName (use
+	composeFieldName instead), rename function composeFieldName to be
+	indexFieldName, add function indexGroupName because each
+	invocation of writeFastBitIndex needs a new ADIOS group with a
+	different name, modify getGroupInfo to allow time to appear as any
+	part of the group name
+	* examples/BPqueryIndex.cpp: restore the code in do_query that
+	extract the selected values
+	* src/BPArrayIODriver.cpp: modify getADIOSVar to use the full
+	variable name instead of just the last part
+
+2012-10-30 John Wu
+	* src/fqVar.h: check the sizes of arrays in setName
+	* src/fqPart.cpp: in buildIndexes, only build indexes if the
+	number of rows is more than 1024
+
+2012-10-29 John Wu
+	* src/BPArrayIODriver.cpp: rename composeGrpName to
+	composeFBIprefix (FBI as a shorthand for FastBit Index), make
+	consistent uses of the prefix in writing
+
+2012-10-28 John Wu
+	* configure.ac: check for the default path used by the procedure
+	that automatically downloads FastBit (test the code on
+	portnoy.lbl.gov)
+
+2012-10-26 John Wu
+	* configure.ac: add code to automatically download FastBit
+	ibis1.3.3
+	* src/*.cpp: minor clean up based on the warnings from PGI
+	compilers
+	* src/BPArrayIODrive.cpp: select correct ADIOS method depending on
+	whether MPI is being used
+	* src/ADIOS_Wrapper.h, src/ADIOS_Wrapper.cpp: avoid opening the
+	file in read-only mode (i.e., avoid calling the function
+	ADIOS_File::open) if ADIOS_File is not initialized with read-only
+	mode
+
+2012-10-25 John Wu
+	* src/ADIOS_Wrapper.h, src/ADIOS_Wrapper.cpp: remove the argument
+	readOnly from the constructor of ADIOS_File because the BP file is
+	always open in read only mode (all write operations have to open
+	the file in the write mode separately), check the nil pointers in
+	the arguments to ADIOS_Var constructors
+
+2012-10-24 John Wu
+	* examples/BP*.cpp, examples/MagNull*.cpp: update for working
+	without MPI
+	* src/BPArrayIODriver.h, src/BPArrayIODriver.cpp: remove unused
+	functions getFastBitGrpName, getFastBitVarName,
+	getFastBitVariableInfo, rename makeFastBitGrpName to
+	composeGrpName, makeFastBitFieldName to composeFieldName
+	* src/fqVar.h: change VarSpace::getCounts and friends to return a
+	constant reference to the underlying vectors instead of new
+	vectors
+
+2012-10-23 John Wu
+	* src/BPArrayIODriver.cpp: clean up log messages
+	* configure.ac: update for NOMPI build
+
+2012-10-22 John Wu
+	* configure.ac: add code to remove -O flags from CXXFLAGS and
+	CFLAGS with --disable-xopt is specified
+	* examples/histogram.cpp: clean up in-line documentation
+
+2012-10-19 John Wu
+	* src/fq.h, src/fq.cpp: update to match the new constructors of
+	BPArrayIODriver
+	* src/ADIOS_Wrapper.h, src/ADIOS_Wrapper.cpp,
+	src/BPArrayIODriver.h, src/BPArrayIODriver.cpp: modification to
+	work with ADIOS 1.4
+	* examples/Makefile.am: add targets MagNullQueryIndex and
+	MagNullQueryScan
+	* examples/MagNull*.cpp, examples/BP*.cpp: update files so that
+	they can be compiled (still need debugging)
+
+2012-10-15 John Wu
+	* src/Doxyfile: disable the generation of latex files
+
+2012-10-09 Jerry Chou
+	* src/queryProcessor.*, src/fqPart.*: change histogram type from
+	uint64 to uint32
+	* INSTALL: add note on how to compile seralized version on HOPPER
+
+2012-10-05 John Wu
+	* src/arrayIODriver.h, src/BPArrayIODrive.h: add indentation to
+	the in-line documentation
+
+2012-09-21 John Wu
+	* configure.ac: change INCLUDE to AM_CPPFLAGS to satisfy autoconf
+	1.12.4
+
+2012-05-29 John Wu
+	* src/indexBuilder.h: remove #include "hdf5file.h"
+	* configure.ac: when --disable-parallel is specified, the default
+	version of library has no MPI
+
+2012-05-29 Seung Woo Son
+	* src/pnetCDFfile.cpp: fix a bug during equalityQuery
+	* configure.ac: add FQ_VERIFIED_PNETCDF condition for checking least
+	requirement of FastQuery build
+
+2012-05-10 John Wu
+	* INSTALL, README: add note about source availbe from portal.nersc.gov
+	* Makefile.am, src/Makefile.am, examples/Makefile.am: make sure
+	'make dist' includes all necessary files to run the test scripts
+
+2012-04-27 John Wu
+	* COPYING: add official copyright notice (BSD with grant-back)
+
+2012-02-27 Seung Woo Son
+	* src/pnetCDFfile.cpp: modify createBitmapKeys(), createBitmapOffset(),
+	and createBitmap() so that the bitmap, bitmapkeys, and bitmapoffsets
+	are stored in a separate variable during each mpi iteration
+
+2012-02-21 Seung Woo Son
+	* src/pnetCDFfile.cpp: add/modify functions related to building indexes
+	* src/fq.cpp: remove conditional initialization of mpi_comm
+
+2012-02-18 John Wu
+	* examples/Makefile.am: bypass libtool to avoid problems on hopper
+	(Cray XE6), update rule nompi to make sure FQ_NOMPI is defined
+	among the CXXFLAGS
+	* *: replace leftover FQ_HAVE_MPIO with FQ_NOMPI (inverted)
+
+2012-02-17 John Wu
+	* src/fq.h: consolidate the detection of whether to report timing
+	information to one static member variable of FastQuery class
+	* src/Makefile.am: modify rule to remove libfastquery_nompi.la in
+	'make clean', add call to NORMAL_INSTALL to install-exec-local
+
+2012-02-17 Seung Woo Son
+	* src/pnetCDFfile.cpp, src/pnetCDFfile.h: add pnetCDF support
+
+2012-02-16 John Wu
+	* configure.ac: remove FQ_HAVE_MPIO, replce with source code with
+	FQ_NOMPI (to be passed through command line through
+	CXXFLAGS/CFLAGS)
+	* src/Makefile.am: add rules to build libfastquery_nompi.a
+	* src/ADIOS_Wrapper.*, src/fq.cpp: reformat code to be less than
+	80-character per line, fix error reported by gcc 3.4
+
+2012-02-03 Jerry Chou
+	* configure.ac: remove --enable-mpi, mpi library will always be
+        checked. Add MPICH_HOME into default mpi path location.
+
+2012-01-10 John Wu
+	* configure.ac: check for CRAY_HDF5_DIR and CRAY_NETCDF_DIR when
+	the corresponding options are enabled but package directories are
+	not specified
+	* src/hdf5file.cpp: change the 3rd argument to
+	H5Pset_fapl_mpiposix and H5Pset_fapl_mpio from MPI_INFO_NULL to 0
+	(they actually want the boolean value false to indicate we are not
+	using gpfs, so a better solution is needed in the future)
+
+2012-01-09 John Wu
+	* configure.ac: clean up, restore FLAGS after failed compilation
+	tests, add --with-szlib to specify szlib to be used with HDF5
+
+2012-01-08 John Wu
+	* configure.ac: only attempt to link with netCDF, HDF5 and BP if
+	asked throught --enable-option or --with-option, declare error
+	only if none of netCDF, HDF5 or BP is verified to exist
+
+2012-01-07 John Wu
+	* src/netCDFfile.cpp, src/hdf5file.cpp, src/queryProcessor.cpp:
+	address warnings raised by GCC 4.2.1 on a MAC
+	* configure.ac: attempt to compile a MPI program without any flags
+	to see if it works (this should work on Cray machines using Cray's
+	own compiler wrappers)
+
+2012-01-06 John Wu
+	* configure.ac: add tests for libmpi in addition to libmpich when
+	checking for MPI
+
+2011-12-13 John Wu
+	* src/fpPart.cpp: update for FastBit version 1.2.6
+
+/**** version0.8 ****/
+2011-09-08 Jerry Chou
+       *: fix examples/read.cpp to free file handler before MPI_Finalize
+       *: fix the number of built variables in indexBuilder::buildIndexes()
+2011-07-15 Jinoh Kim & Jerry Chou
+       *: add BP driver
+       *: add BP example code: BPread.cpp, BPbuildIndex.cpp BPqueryIndex.cpp
+       *: fix read.cpp
+2011-07-07 Jerry Chou
+       *: add ibis::BYTE to fqIndex.cpp
+       *: add -l option to examples/writeAttr.cpp
+       *: add file description in README
+       *: fix query syntax to include varPath
+2011-06-03 Jerry Chou
+       *: change the fastbit version to 1.2.3.4
+       *: remove __curDatasetId and __curDatasetName from hdf5file.cpp and hdf5file.h
+       *: add optimization and debug options to the configure.ac file
+       *: allow varName to be the fullpath starting with '/' by modifying the MetadataMgr::getAllVariables()
+       *: fix bug for chunking and unlimit dataset code in HDF5::__createDataset()
+       *: fix bug for setting bitmapOffset and range in FQ_IndexBinned::write()
+       *: fix bug by replacing constructor array_t(T*, start, offset) with array_t(T*, start, end) in FQ_IndexBinned::activate() and FQ_IndexUnbinned::activate()
+       *: fix bug by replacing the word_t size from 4 bytes to sizeof(word_t)
+
+/**** version0.7 ****/
+2011-05-12 Jerry Chou
+        *: checked in the initial set of files into SVN at nersc
+

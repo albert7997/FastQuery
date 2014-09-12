@@ -1,0 +1,35 @@
+#PBS -q regular
+#PBS -l mppwidth=12
+#PBS -l mppnppn=4
+#PBS -l walltime=00:10:00
+#PBS -j eo
+
+export CRAY_ROOTFS=DSL
+module load netcdf
+cd work/fq
+rm test_index.bp
+
+## Read test
+aprun -n 1 ./examples/BPread -f examples/test_data.bp -n temperature 
+
+## Creating index test: if succeeded, test_index.bp will be created with size 2528 bytes
+## You can see the internal of the BP file by using "bpls -lavr test_index.bp"
+aprun -n 1 ./examples/BPbuildIndex -f examples/test_data.bp -i test_index.bp -n temperature -p time11 
+
+## Query test: if succeeded, the number of hits should be 14 hits
+aprun -n 1 ./examples/BPqueryIndex  -f examples/test_data.bp -q "temperature > 1125" -p "/time11/temperature" -i test_index.bp 
+
+## For multiple proceses
+aprun -n 4 ./examples/BPbuildIndex -f examples/test_data.bp -i test_index.bp -n temperature -p time11 -l 1 
+aprun -n 4 ./examples/BPqueryIndex  -f examples/test_data.bp -q "temperature > 1125" -p "/time11/temperature" -i test_index.bp -l 1 
+
+
+## MagNull test
+aprun -n 1 ./examples/MagNullBuildIndex -f $SCRATCH/record.bp -i magnull_index.bp
+aprun -n 1 ./examples/MagNullQueryScan  -f $SCRATCH/record.bp -t 0.001 
+aprun -n 1 ./examples/MagNullQueryIndex  -f $SCRATCH/record_add.bp -i magnull_index.bp -t 0.001  
+
+## For multiple proceses
+aprun -n 4 ./examples/MagNullBuildIndex -f $SCRATCH/record.bp -i magnull_index.bp -l 70
+aprun -n 4 ./examples/MagNullQueryScan  -f $SCRATCH/record.bp -t 0.001 -l 70
+aprun -n 4 ./examples/MagNullQueryIndex  -f $SCRATCH/record_add.bp -i magnull_index.bp -t 0.001 -l 70

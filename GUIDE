@@ -1,0 +1,421 @@
+=========================
+Running example programs:
+=========================
+
+There are four tool programs in direct "examples" that can directly be used to read/write/query/index a file.
+These tools are implemented by the FastQuery API.
+
+- writeData.cpp: Write data
+
+	./examples/writeData -f data-file-name -i input-data-file-name -n variable-name -p variable-path 
+	-d variable-dimension [e.g. 2:2] -t variable-type [double, float, int, long, uint, ulong, byte] -l variable-length 
+	[-m file-format [HDF5(default), H5PART, NETCDF] [-v verboseness] [-c (check)]
+
+	It creates a variable, then writes the data into the variable dataset in file "data-file-name"
+ 	The dataset for the variable will be created at the location "variable-path/variable-name".
+	Notice: Because NETCDF does not allow remove dataset, the pre-existence of the dataset 
+	at the same location will cause error.
+
+	The type of the variable can be any of the supported type in FastQuery:
+	[double, float, int, long, uint, ulong, byte].
+
+	The dimension of the variable dataset is specified by variable-dimension, which is a vector of 
+	length for each of dimensions.
+	E.g: 100 is a one dimensional variable with 100 elements.
+	     2:2 is a 2-by-2 two dimensional variable.
+	
+	The data values is read from a input file specified by option -i.
+	The values in the file should be separated by space.
+	     
+	Use option "-c" to verify the written result by reading the data out and comparing to the original data.
+
+	Excerise FastQuery API:
+	  IndexBuilder::isValid()
+	  IndexBuilder::createNewVariable()
+	  IndexBuilder::setData()
+	  IndexBuilder::getData()
+
+- writeAttr.cpp: Write attribute
+	./examples/writeAttr -f data-file-name -i input-file-name -g log-file-name -n variable-name 
+	-p variable-path -a attribute-name -t attribute-type [double, float, int, long, uint, ulong, byte] -l attribute-length
+	[-m file-format [HDF5(default), H5PART, NETCDF] [-v verboseness] [-c (check)]
+
+	It creates an attribute for a variable and set its value in file "data-file-name".
+ 	The variable has to exsit already. If the attribute already exist, it will be replaced.
+
+	The type of the attribute can be any of the supported type in FastQuery:
+	[double, float, int, long, uint, ulong, byte].
+
+	The length of the attribute is specified by the option -l.
+
+	The data values is read from a input file specified by the option -i.
+	The values in the file should be separated by space.
+
+	Use option "-c" to verify the written result by reading the data out and comparing to the original data.
+	
+	Excerise FastQuery API:
+	  IndexBuilder::isValid()
+	  IndexBuilder::setAttribute()
+	  IndexBuilder::getAttribute()
+
+- read.cpp: Reads data or attribute value
+	./examples/read -f data-file-name -n variable-name [-p variable-path] [-a attribute-name] 
+	[-m file-format [HDF5(default), H5PART, NETCDF] [-v verboseness] [-d (display)]
+
+	It reads data from a variable or attribute from file "data-file-name".
+	The corresponding dataset and attribute must exist in the file.
+
+	It reads an attribute value if the attribute-name is givien with the option "-a".
+	Otherwise, it reads the value of a variable at location "variable-path/variable-name".
+
+	To print out the retriving data values, please give the option "-d".
+
+	Excerise FastQuery API:
+	  QueryProcessor::isValid()
+	  QueryProcessor::getVariableInfo()
+	  QueryProcessor::getAttributeInfo()
+	  QueryProcessor::getData()
+	  QueryProcessor::getAttribute()
+
+- buildIndex.cpp: Builds bitmap indexes
+	./examples/buildIndex -f data-file-name [-i index-file-name] [-g log-file] [-n variable-name] 
+	[-p variable-path] [-b '<binning nbins=1000 />' (default unbinned)] [-r (force-rebuild-index)] 
+	[-v verboseness] [-m fileModel [HDF5(default), H5PART, NETCDF]] [-l mpi_subarray_size(default=100000)]
+
+	It builds index for a set of variables whose dataset location has the prefix variable-path 
+	and postfix variable-name.
+
+	Use option "-i" to specify the output file for storing indexes.
+	Otherwise, the indexes are written back to data file "data-file-name".
+
+	Use option "-r" to enforce rebuild and replace the existing index.
+
+	Under parallel mode, use "-l" to set the subarray size for spitting dataset.
+
+	Use option "-b" to specify the binning option to build the index.
+	The available binning option is defined and provided by the FastBit.
+	More information can be found at http://crd.lbl.gov/~kewu/fastbit/doc/indexSpec.html.
+	Binning option is suggested to be used with large dataset to reduce the size of built index.
+	Precision option is suggested to be used when the query involves floating point numbers.
+
+	Excerise FastQuery API:
+	  IndexBuilder::isValid()
+	  IndexBuilder::getAllVariables()
+	  IndexBuilder::buildIndexes()
+
+- queryIndex.cpp: Process query
+	./examples/queryIndex -f data-file-name  -q query-conditions-in-a-single-string  
+	[-i index-file-name] [-g log-file-name] [-n name-of-variable] [-p path-of-variable]  
+	[-m file model [HDF5(default), H5PART, NETCDF] [-b use-boundingbox-data-selection] [-v verboseness]
+	[-l mpi-subarray-length]
+
+	It processes query using indexes if they exist.
+	If index-file-name is not given, indexes is assumed to be in the data-file-name.
+
+	If name-of-variable is given, it verifies the searching result by executing the 
+	equality query with the selecting data values.
+	The verfication only valid when the query involves a single variable.
+
+	Excerise FastQuery API:
+	  QueryProcessor::isValid()
+	  QueryProcessor::getVariableInfo()
+	  QueryProcessor::getNumHits()
+	  QueryProcessor::executeQuery()
+	  QueryProcessor::getSelectedData()
+	  QueryProcessor::executeEqualitySelectionQuery()
+
+-----------------------
+Write Data Examples:
+-----------------------
+The file created by the following commands:
+
+		               /
+			/      | 	\
+		     time1    time2	x
+		       |	|        
+		       x        x    
+
+./examples/writeData -f examples/test.h5 -i examples/test.dat -n x -p "/time1" -d "4:3" -t double 
+
+	The HDF5 file "examples/test.h5" is created if not exist already.
+	Dataset "/time1/x" is created for the new variable.
+	The type of the variable is double.
+	The dimension of the variable is 4 x 3.
+	The initial values of the data are in file "examples/test.dat".
+
+./examples/writeData -f examples/test.h5 -i examples/test.dat -n x -p "/time2" -d "12:1" -t long
+
+	The HDF5 file "examples/test.h5" is created if not exist already.
+	Dataset "/time2/x" is created for the new variable.
+	The type of the variable is int64_t.
+	The dimension of the variable is 12 x 1.
+	The initial values of the data are in file "examples/test.dat".
+
+./examples/writeData -f examples/test.h5 -i examples/test.dat -n x -d "2:3:2" -t ulong 
+
+	The HDF5 file "examples/test.h5" is created if not exist already.
+	Dataset "/x" is created for the new variable.
+	The type of the variable is unsigned long uint64_t.
+	The dimension of the variable is 2 x 3 x 2.
+	The initial values of the data are in file "examples/test.dat".
+
+You can inspect the data layout and content of the file with command
+
+h5dump examples/test.h5
+ncdump examples/test.nc
+
+-----------------------
+Write Attribute Examples:
+-----------------------
+Given a file with the following structure, and all variables are two dimensional:
+
+		               /
+			/      | 	\
+		     time1    time2	x
+		      /	\      /  \
+		     x   y    x    y
+
+./examples/writeAttr -f examples/test.h5 -i examples/test.dat -n x -p "/time1" -a "attr" -l 2 -t int 
+
+	Create an attribute "attr" for variable "/time1/x" in HDF5 file "examples/test.h5"
+	The type of the attribute is int32_t
+	The length of the attribute is 2
+	The value of the data is the first 2 numbers in file "examples/test.dat"
+
+./examples/writeAttr -f examples/test.h5 -i examples/test.dat -n x -p "/time1" -a "attr" -l 10 -t double
+
+	Create an attribute "attr" for variable "/time1/x" in HDF5 file "examples/test.h5"
+	The type of the attribute is double
+	The length of the attribute is 10
+	The value of the data is the first 10 numbers in file "examples/test.dat"
+
+-----------------------
+Read Data Examples:
+-----------------------
+Given a file with the following structure, and all variables are two dimensional:
+
+		               /
+			/      | 	\
+		     time1    time2	x
+		      /	\      /  \
+		     x   y    x    y
+
+./examples/read -f examples/test.h5 -n x -p time1 
+
+	Read the data value of variable "/time1/x" 
+	from a HDF5 file "examples/test.h5".
+
+./examples/read -f examples/test.h5 -n x -p time1 -d
+
+	Read and display the data value of variable "/time1/x" 
+	from a HDF5 file "examples/test.h5".
+
+./examples/read -f examples/test.nc -n x -m NETCDF
+
+	Read the data value of variable "/time1/x" 
+	from a NETCDF file "examples/test.nc".
+
+./examples/read -f examples/test.h5 -n x
+
+	Read the data value of variable "/x" 
+	from a HDF5 file "examples/test.h5".
+	The variable "/x" is choosen because it matches to the specified 
+	variable name and has the shortest path.
+
+./examples/read -f examples/test.h5 -n x[0,:] 
+
+	Read data in the first column from variable "/x" 
+	in a HDF5 file "examples/test.h5".
+
+./examples/read -f examples/test.h5 -n x[0:10,1:3] 
+	
+	Read data in the subarray range [0:10,1:3] 
+	from variable "/x" in a HDF5 file "examples/test.h5".
+
+-----------------------
+Read Attribute Examples:
+-----------------------
+Given a file with the following structure, and all variables are two dimensional:
+
+		               /
+			/      | 	\
+		     time1    time2	x
+		      /	\      /  \
+		     x   y    x    y
+
+./examples/read -f examples/test.h5 -n x -p time1 -a attr
+
+	Read the attribute values of "attr" of variable "/time1/x" 
+	from a HDF5 file "examples/test.h5"
+
+./examples/read -f examples/test.h5 -n x -a attr
+
+	Read the attribute values of "attr" of variable "/x" 
+	from a HDF5 file "examples/test.h5".
+	The variable "/x" is choosen because it matches to the specified 
+	variable name and has the shortest path.
+
+./examples/read -f examples/test.h5 -n x -p TimeStep1 -a attr -d
+
+	Read and print the attribute values of "attr" of variable "/time1/x" 
+	from a HDF5 file "examples/h5uc-data.h5".
+
+./examples/read -f examples/test.nc -n x -p time1 -a attr -m NETCDF
+
+	Read the attribute values of "attr" of variable "/time1/x" 
+	from a NetCDF file "examples/test.nc".
+
+-----------------------
+Build Index Examples:
+-----------------------
+Given a file with the following structure, and all variables are two dimensional:
+The index will be stored under the same path its variable for HDF5 and NetCDF format.
+But, the index will be stored under the __Index group for the H5Part format according to the H5Part layout.
+
+
+		               /
+			/      | 	\
+		     time1    time2	x
+		      /	\      /  \
+		     x   y    x    y
+
+./examples/buildIndex -f examples/test.h5
+
+	Build index for all variables in a HDF5 file, 
+	and write the index to file "examples/test.h5".
+	If the index already exist, new index will not be built.
+
+./examples/buildIndex -f examples/test.nc
+
+	Build index for all variables in a NetCDF file, 
+	and write the index to file "examples/test.nc".
+	If the index already exist, new index will not be built.
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -r
+
+	Build index for all variables in a HDF5 file, 	
+	and write the index to file "examples/test-index.h5".
+	If the index already exist, it will be overwritten by the new built index.
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 
+
+	Build index for all variables in a HDF5 file, 
+	and write the index to file "examples/test-index.h5".
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -n x
+
+	Build index for all variables "/time1/x", "/time2/x", "/x".
+	Built index is written to file "examples/test-index.h5".
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -p time1
+	
+	Build index for all variables "/time1/x", "/time1/y".
+	Built index is written to file "examples/test-index.h5".
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -n x -p time1
+
+	Build index for all variables "/time1/x".
+	Built index is written to file "examples/test-index.h5".
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -n x -p time1 -b <binning nbin=100>
+
+	Build index for all variables "/time1/x".
+	The index is built by 100 bins.
+	Built index is written to file "examples/test-index.h5".
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -n x -p time1 -b <binning precision=3>
+
+	Build index for all variables "/time1/x".
+	The index is built with 3 digit precision bins.
+	Built index is written to file "examples/test-index.h5".
+
+./examples/buildIndex -f examples/test.h5 -i examples/test-index.h5 -n x -l 100
+
+	Build index for all variables "/time1/x", "/time2/x", "/x".
+	If the program is built and executed in parallel mode, 
+	the index is built with splitting subarray size 100.
+	Built index is written to file "examples/test-index.h5".
+
+-----------------------
+Query Index Examples:
+-----------------------
+Given a file with the following structure, and all variables are two dimensional:
+
+		               /
+			/      | 	\
+		     time1    time2	x
+		      /	\      /  \
+		     x   y    x    y
+
+./examples/queryIndex -f examples/test.h5 -q "x>3 && x<8" -p time1
+
+	Process query on variable "/time1/x".
+	Index is provided from a HDF5 file "examples/test.h5".
+
+./examples/queryIndex -f examples/test.nc -q "x>3 && x<8" -p time1 -m NETCDF
+
+	Process query on variable "/time1/x".
+	Index is provided from a NetCDF file "examples/test.nc".
+
+./examples/queryIndex -f examples/test.h5 -q "x>3 && x<8" -p time1 -m H5PART
+
+	Process query on variable "/time1/x".
+	Index is provided from a HDF5 file "examples/test.h5".
+	The index storage location in the file "examples/test.h5" will follow the H5PART layout.
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x>3 && x<8" -p time1
+
+	Process query on variable "/time1/x".
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x>3 && x<8" -p time1 -d
+
+	Process query on variable "/time1/x" and display the results.
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x>3 && x<8" -p time2
+
+	Process query on variable "/time2/x".
+	Index is provided from a HDF5 file "examples/test-index.h5".
+	Index is provided from file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x>3 && x<8"
+
+	Process query on variable "/x".
+	Index is provided from a HDF5 file "examples/test-index.h5".
+	Index is provided from file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x[1,:]>3 && y[1,:]<8" -p time1 
+
+	Process query on the first column values 
+	from variable "/time1/x" and "/time1/y".
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x[1,:]>3 && y[1,:]<8" -p time1 
+
+	Process query on the first column values 
+	from variable "/time1/x" and "/time1/y". 
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "x[1,0:10]>3 && y[1,0:10]<8" -p time1 
+
+	Process query on the first 10 elements of first column values 
+	from variable "/time1/x" and "/time1/y". 
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "time1/x[1,:]>3 && x[1,:]<8" 
+
+	Process query on the first column values from variable "/time1/x" and "/x". 
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "time1/x[1,:]>3 && time2/x[1,:]<8" 
+
+	Process query on the first column values from variable "/time1/x" and "/time2/x". 
+	Index is provided from a HDF5 file "examples/test-index.h5".
+
+./examples/queryIndex -f examples/test.h5 -i examples/test-index.h5 -q "time1/x[1,:]>3 && time2/x[1,:]<8" -l 100
+
+	Process query on the first column values from variable "/time1/x" and "/time2/x". 
+	Index is provided from a HDF5 file "examples/test-index.h5".
+	If the program is compared and executed in parallel mode.
+	The index should also be built in parallel mode using the same subarray size 100.

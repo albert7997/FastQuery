@@ -1,0 +1,198 @@
+Grammar
+
+    0 $accept: START "end of input"
+
+    1 queries: queryExpr "logical operator" queries
+    2        | queryExpr
+
+    3 queryExpr: "variable name" "range operator" mathExpr
+
+    4 mathExpr: mathExpr "arithmetic operator" mathExpr
+    5         | '(' mathExpr ')'
+    6         | "number"
+
+    7 START: queries "end of input"
+    8      | queries ';'
+
+
+Terminals, with rules where they appear
+
+"end of input" (0) 0 7
+'(' (40) 5
+')' (41) 5
+';' (59) 8
+error (256)
+"logical operator" (258) 1
+"range operator" (259) 3
+"arithmetic operator" (260) 4
+"number" (261) 6
+"variable name" (262) 3
+
+
+Nonterminals, with rules where they appear
+
+$accept (11)
+    on left: 0
+queries (12)
+    on left: 1 2, on right: 1 7 8
+queryExpr (13)
+    on left: 3, on right: 1 2
+mathExpr (14)
+    on left: 4 5 6, on right: 3 4 5
+START (15)
+    on left: 7 8, on right: 0
+
+
+state 0
+
+    0 $accept: . START "end of input"
+
+    "variable name"  shift, and go to state 1
+
+    queries    go to state 2
+    queryExpr  go to state 3
+    START      go to state 4
+
+
+state 1
+
+    3 queryExpr: "variable name" . "range operator" mathExpr
+
+    "range operator"  shift, and go to state 5
+
+
+state 2
+
+    7 START: queries . "end of input"
+    8      | queries . ';'
+
+    "end of input"  shift, and go to state 6
+    ';'             shift, and go to state 7
+
+
+state 3
+
+    1 queries: queryExpr . "logical operator" queries
+    2        | queryExpr .
+
+    "logical operator"  shift, and go to state 8
+
+    $default  reduce using rule 2 (queries)
+
+
+state 4
+
+    0 $accept: START . "end of input"
+
+    "end of input"  shift, and go to state 9
+
+
+state 5
+
+    3 queryExpr: "variable name" "range operator" . mathExpr
+
+    "number"  shift, and go to state 10
+    '('       shift, and go to state 11
+
+    mathExpr  go to state 12
+
+
+state 6
+
+    7 START: queries "end of input" .
+
+    $default  reduce using rule 7 (START)
+
+
+state 7
+
+    8 START: queries ';' .
+
+    $default  reduce using rule 8 (START)
+
+
+state 8
+
+    1 queries: queryExpr "logical operator" . queries
+
+    "variable name"  shift, and go to state 1
+
+    queries    go to state 13
+    queryExpr  go to state 3
+
+
+state 9
+
+    0 $accept: START "end of input" .
+
+    $default  accept
+
+
+state 10
+
+    6 mathExpr: "number" .
+
+    $default  reduce using rule 6 (mathExpr)
+
+
+state 11
+
+    5 mathExpr: '(' . mathExpr ')'
+
+    "number"  shift, and go to state 10
+    '('       shift, and go to state 11
+
+    mathExpr  go to state 14
+
+
+state 12
+
+    3 queryExpr: "variable name" "range operator" mathExpr .
+    4 mathExpr: mathExpr . "arithmetic operator" mathExpr
+
+    "arithmetic operator"  shift, and go to state 15
+
+    $default  reduce using rule 3 (queryExpr)
+
+
+state 13
+
+    1 queries: queryExpr "logical operator" queries .
+
+    $default  reduce using rule 1 (queries)
+
+
+state 14
+
+    4 mathExpr: mathExpr . "arithmetic operator" mathExpr
+    5         | '(' mathExpr . ')'
+
+    "arithmetic operator"  shift, and go to state 15
+    ')'                    shift, and go to state 16
+
+
+state 15
+
+    4 mathExpr: mathExpr "arithmetic operator" . mathExpr
+
+    "number"  shift, and go to state 10
+    '('       shift, and go to state 11
+
+    mathExpr  go to state 17
+
+
+state 16
+
+    5 mathExpr: '(' mathExpr ')' .
+
+    $default  reduce using rule 5 (mathExpr)
+
+
+state 17
+
+    4 mathExpr: mathExpr . "arithmetic operator" mathExpr
+    4         | mathExpr "arithmetic operator" mathExpr .
+
+    "arithmetic operator"  shift, and go to state 15
+
+    $default  reduce using rule 4 (mathExpr)

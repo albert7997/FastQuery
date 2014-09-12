@@ -1,0 +1,78 @@
+***********************************************************************
+FastQuery Copyright (c) 2011 - 2013, The Regents of the University of
+California, through Lawrence Berkeley National Laboratory (subject to
+receipt of any required approvals from the U.S. Dept. of Energy).  This
+software was developed under funding from Dept. of Energy, Office of
+Science, Office of Advanced Scientific Computing Research (ASCR).  All
+rights reserved.
+
+Full license in the file named COPYING
+***********************************************************************
+
+
+FastQuery provides a simple API for indexing and querying scientific format
+datasets using the FastBit bitmap index technology. 
+Datasets can be retrieved using complex compound range queries such as "(energy > 100)
+&& (70 < pressure < 90)". The bitmap index technology only retrieves
+the data elements that satisfy the query condition and shows
+significant speedup compared with reading the entire datasets. 
+
+Current support file format:
+--- HDF5 
+--- NETCDF (only supported in seralized mode)
+--- BP (under testing)
+
+Current support data type:
+--- double
+--- float
+--- byte:char
+--- int:int32_t
+--- uint:uint32_t
+--- long:int64_t
+--- ulong:uint64_t
+
+source code structure
+--src---const.h: constant header file
+     |--fastquery-config.h: header file generated from config
+     |--FlexLexer.h: header file for flex and lexer
+     |--fileDriver.h: unified I/O interface for array model data
+     |--fq.h: fastquery basic API 
+     |--indexBuilder.h: fastquery index builder API
+     |--queryProcessor.h: fastquery query processor API
+     |--metadataMgr.h: manage and provide variable metadata information to fastquery
+     |--fqParser.h: fastquery parser object
+     |--fqPart: wrapper for the ibis::part object
+     |--fqColumn: wrapper for the ibis::column object
+     |--fqVar: data structure for storing variable information
+     |--fqIndex: wrapper for the ibis::rlic and ibis::bin objects
+     |--hdf5file.h: hdf5 implementation for the array I/O interface
+     |--queryParser.yy: define query syntax
+     |--queryLexer.ll: define query token
+     |--netCDFfile.h: hdf5 implementation for the array I/O interface
+
+Detailed information about FastQuery and the underlying data
+model can be found in the following technical report: 
+
+	To be available
+
+Detailed information about parallel version of FastQuery 
+can be found in the following technical report: 
+
+	To be available
+
+For more information on installing FastQuery and running sample
+programs see INSTALLATION and GUIDE. 
+
+The directory docs contains a number of HTML files that documents key
+features of FastQuery. There is considerable amount of in-line documentation 
+in the source code; execute the following command to invoke doxygen and 
+extract the in-line documentation
+
+make docs
+
+The resulting documentation is in directory doc/html.
+
+This code was originally developed by Jerry Chou <jerrycchou at gmail dot com>
+This code is currently maintained by John Wu <John dot Wu at nersc dot gov> and Surendra Byna <sbyna at lbl dot gov>
+
+You can download the latest soruce code form <http://portal.nersc.gov/svn/fq>.
