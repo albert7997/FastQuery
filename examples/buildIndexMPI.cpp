@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
 	    model = FQ::FQ_NetCDF;
     	} else if (format.compare("PNETCDF") == 0) {
 	    model = FQ::FQ_pnetCDF;
+	}
     }
 
 
